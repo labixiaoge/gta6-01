@@ -3,17 +3,145 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
+<title>Sunhaven Bay — Open World Crime</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1020;
+    font-family: "Segoe UI", Verdana, sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .hidden { display: none !important; }
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #topbar { position: absolute; top: 12px; right: 16px; text-align: right; }
+  #stars { font-size: 30px; letter-spacing: 4px; color: #ffd23e;
+    text-shadow: 0 0 8px rgba(0,0,0,.8); }
+  #stars .off { color: rgba(255,255,255,.25); }
+  #money { font-size: 26px; font-weight: 700; color: #7dff8a;
+    text-shadow: 0 2px 4px #000; }
+  #clock { font-size: 15px; color: #cfe3ff; text-shadow: 0 1px 3px #000; }
+  #healthbar { position: absolute; top: 14px; left: 16px; width: 240px; }
+  #healthbar .label { font-size: 13px; letter-spacing: 2px; color: #ffd9d9;
+    text-shadow: 0 1px 3px #000; }
+  #healthfill { height: 14px; background: #e33; border: 2px solid #0008;
+    border-radius: 4px; width: 100%; box-shadow: 0 0 6px #0008; }
+  #armorfill { height: 8px; background: #3af; border: 2px solid #0008;
+    border-radius: 4px; width: 60%; margin-top: 4px; }
+  #ammo { position: absolute; top: 76px; left: 16px; font-size: 17px;
+    text-shadow: 0 1px 3px #000; }
+  #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    max-width: 520px; background: rgba(5,10,30,.72); border: 1px solid #ffffff33;
+    border-radius: 8px; padding: 8px 16px; text-align: center; }
+  #objective .mname { font-size: 15px; font-weight: 700; color: #ffd23e; }
+  #objective .mtext { font-size: 14px; color: #eaf2ff; margin-top: 2px; }
+  #speedo { position: absolute; right: 18px; bottom: 18px; text-align: right;
+    font-size: 34px; font-weight: 800; text-shadow: 0 2px 6px #000; }
+  #speedo small { font-size: 14px; color: #cfe3ff; }
+  #minimap { position: absolute; left: 16px; bottom: 16px; width: 210px; height: 210px;
+    border: 3px solid #ffffff55; border-radius: 50%; background: #0a1a2a;
+    box-shadow: 0 0 12px #000a; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+    margin: -11px 0 0 -11px; font-size: 22px; line-height: 1; text-align: center;
+    color: #fff; text-shadow: 0 0 4px #000; }
+  #toast { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%);
+    font-size: 20px; font-weight: 700; color: #ffe9a8; text-shadow: 0 2px 5px #000;
+    background: rgba(0,0,0,.45); padding: 6px 18px; border-radius: 8px; }
+  #hint { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+    font-size: 14px; color: #dfeaff; text-shadow: 0 1px 3px #000;
+    background: rgba(0,0,0,.4); padding: 5px 12px; border-radius: 6px; }
+  #wasted { position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 84px; font-weight: 900; letter-spacing: 12px;
+    color: #ff4444; text-shadow: 0 0 30px #000; background: rgba(20,0,0,.45); }
+  /* Red flash at the screen edges whenever the player takes a hit. */
+  #dmg { position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,.55) 100%);
+    transition: opacity .12s; }
+  #healthfill.low { animation: lowhp .7s infinite alternate; }
+  @keyframes lowhp { from { box-shadow: 0 0 4px #0008; } to { box-shadow: 0 0 16px #ff2222; } }
+  #stars.hot { animation: wanted .5s infinite alternate; }
+  @keyframes wanted { from { transform: scale(1); } to { transform: scale(1.08); } }
+  /* ---------- Menus ---------- */
+  .menu { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center;
+    justify-content: center; flex-direction: column;
+    background: linear-gradient(160deg, rgba(8,12,40,.88), rgba(60,10,60,.82)); }
+  .menu h1 { font-size: 64px; margin: 0; letter-spacing: 4px; color: #ffd23e;
+    text-shadow: 0 4px 0 #b3541e, 0 8px 24px #000; }
+  .menu h2 { font-size: 20px; margin: 6px 0 26px; color: #9fd8ff; letter-spacing: 6px; }
+  .menu p.story { max-width: 560px; text-align: center; line-height: 1.6;
+    color: #e8f0ff; font-size: 16px; }
+  .menu button { pointer-events: auto; font-size: 20px; padding: 12px 42px; margin: 8px;
+    border: none; border-radius: 8px; background: #ffb400; color: #201400;
+    font-weight: 800; cursor: pointer; box-shadow: 0 4px 0 #8a5c00; }
+  .menu button:hover { background: #ffd23e; }
+  .menu button.secondary { background: #22365e; color: #cfe3ff; box-shadow: 0 4px 0 #101d33; }
+  .menu .controls { margin-top: 18px; font-size: 14px; color: #bcd2ff; line-height: 1.9;
+    text-align: center; }
+  #dialog { position: absolute; left: 50%; bottom: 170px; transform: translateX(-50%);
+    width: 620px; max-width: 90vw; background: rgba(5,10,30,.85);
+    border-left: 5px solid #ffb400; border-radius: 6px; padding: 12px 18px; z-index: 6; }
+  #dialog .who { color: #ffb400; font-weight: 800; font-size: 15px; }
+  #dialog .line { font-size: 16px; line-height: 1.5; margin-top: 3px; }
+  #missioncard { position: fixed; inset: 0; z-index: 9; display: flex;
+    align-items: center; justify-content: center; flex-direction: column;
+    background: rgba(0,0,0,.55); text-align: center; }
+  #missioncard h1 { font-size: 52px; color: #ffd23e; margin: 0;
+    text-shadow: 0 4px 18px #000; }
+  #missioncard p { font-size: 19px; color: #fff; }
+  #missioncard .reward { color: #7dff8a; font-weight: 800; font-size: 22px; }
 </style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
-<p id="status" role="status" aria-live="polite"></p>
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="healthbar"><div class="label">MARCO REYES</div>
+    <div id="healthfill"></div><div id="armorfill"></div></div>
+  <div id="ammo">🔫 Pistol &nbsp;<b id="ammocount">24</b> &nbsp;|&nbsp; 🚗 <span id="carname">On foot</span></div>
+  <div id="topbar"><div id="stars"></div><div id="money">$0</div><div id="clock">DAY 1 · 08:00</div></div>
+  <div id="objective"><div class="mname" id="mname">FREE ROAM</div><div class="mtext" id="mtext">Explore Sunhaven Bay. Find Lena at the garage.</div></div>
+  <div id="crosshair" class="hidden">+</div>
+  <canvas id="minimap" width="210" height="210"></canvas>
+  <div id="speedo" class="hidden"><span id="speed">0</span> <small>MPH</small></div>
+  <div id="toast" class="hidden"></div>
+  <div id="dmg"></div>
+  <div id="hint">WASD move · SHIFT run · E enter/exit car · CLICK shoot · R reload · H honk · M mission · P pause</div>
+  <div id="wasted" class="hidden">WASTED</div>
+</div>
+
+<div id="dialog" class="hidden"><div class="who" id="dlgwho">LENA</div><div class="line" id="dlgline"></div></div>
+
+<div id="missioncard" class="hidden"><h1 id="mc-title">MISSION PASSED</h1>
+  <p id="mc-sub"></p><p class="reward" id="mc-reward"></p></div>
+
+<div id="menu" class="menu">
+  <h1>SUNHAVEN BAY</h1>
+  <h2>AN OPEN-WORLD CRIME STORY</h2>
+  <p class="story">You are <b>Marco Reyes</b>, fresh out of prison and broke in the sun-soaked
+  port city of <b>Sunhaven Bay</b>. Your old friend <b>Lena Cruz</b> runs a garage on
+  Harbor Row — and she has work. Steal cars, outrun the Sunhaven PD, run jobs for
+  the Harbor Crew, and earn your way from the streets to the top of the bay.</p>
+  <button id="btn-start">▶ NEW GAME</button>
+  <button id="btn-continue" class="secondary hidden">↻ CONTINUE — <span id="cont-label"></span></button>
+  <button id="btn-how" class="secondary">HOW TO PLAY</button>
+  <div class="controls hidden" id="howto">
+    WASD / Arrows — move &amp; drive &nbsp;·&nbsp; SHIFT — sprint<br>
+    E — steal / enter / exit car &nbsp;·&nbsp; SPACE — brake / handbrake<br>
+    Mouse click — shoot &nbsp;·&nbsp; R — reload &nbsp;·&nbsp; H — honk &nbsp;·&nbsp; N — mute<br>
+    M — mission list &nbsp;·&nbsp; P / ESC — pause<br>
+    Stealing cars and shooting raises your wanted level. Lose the cops or hide at the garage.
+  </div>
+  <p style="font-size:12px;color:#8fa8d8;margin-top:22px">A fully original game. Sunhaven Bay, its people and its story are invented — no Rockstar content.</p>
+</div>
+
+<div id="pausemenu" class="menu hidden">
+  <h1 style="font-size:44px">PAUSED</h1>
+  <button id="btn-resume">▶ RESUME</button>
+  <button id="btn-restart" class="secondary">↻ RESTART MISSION</button>
+  <button id="btn-quit" class="secondary">■ QUIT TO MENU</button>
+  <div class="controls" id="pause-stats"></div>
+</div>
+
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>
